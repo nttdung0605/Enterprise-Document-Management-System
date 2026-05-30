@@ -1,14 +1,13 @@
-from typing import Literal
 import uuid
 
+from db.database import (
+    Database
+)
 
 class AuthService:
+    def __init__(self):
 
-    def __init__(self) -> None:
-        self.users: dict[str, str] = {
-            "admin": "123456",
-            "dung": "123"
-        }
+        self.db = Database()
 
         self.sessions = {}
 
@@ -16,24 +15,64 @@ class AuthService:
         self,
         username,
         password
-    ) -> tuple[Literal[True], str] | tuple[Literal[False], None]:
+    ):
+
+        conn = (
+            self.db.get_connection()
+        )
+
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT *
+            FROM users
+            WHERE username = ?
+            """,
+            (username,)
+        )
+
+        user = cursor.fetchone()
+
+        conn.close()
+
         if (
-            username in self.users
+            user
             and
-            self.users[username]
+            user["password_hash"]
             == password
         ):
+
             token = str(
                 uuid.uuid4()
             )
 
-            self.sessions[token] = (
-                username
+            self.sessions[token] = {
+
+                "user_id":
+                user["id"],
+
+                "username":
+                user["username"],
+
+                "role":
+                user["role"],
+
+                "department_id":
+                user[
+                    "department_id"
+                ]
+            }
+
+            return (
+                True,
+                token
             )
 
-            return True, token
-
-        return False, None
+        return (
+            False,
+            None
+        )
 
     def logout(
         self,
