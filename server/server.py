@@ -1,7 +1,7 @@
 import socket
 
 from auth import AuthService
-
+from document import DocumentService
 
 class TCPServer:
 
@@ -16,6 +16,10 @@ class TCPServer:
 
         self.auth_service = (
             AuthService()
+        )
+
+        self.document_service = (
+            DocumentService()
         )
 
     def start(self):
@@ -172,7 +176,122 @@ class TCPServer:
                 "LOGIN username password\n"
                 "LOGOUT token"
             )
+    
+        elif command == "UPLOAD":
+                
+            if len(parts) != 3:
+                return (
+                    "USAGE: "
+                    "UPLOAD token filename"
+                )
+        
+            token = parts[1]
+            filename = parts[2]
+        
+            session = (
+                self.require_auth(
+                    token
+                )
+            )
+        
+            if not session:
+                return (
+                    "INVALID_TOKEN"
+                )
+        
+            success = (
+                self.document_service
+                .upload_document(
+                    filename,
+                    session
+                )
+            )
+        
+            if success:
+                return (
+                    "UPLOAD_SUCCESS|PENDING"
+                )
+        
+            return (
+                "UPLOAD_FAILED"
+            )
+        
+        elif command == "LIST_PENDING":
+                
+            if len(parts) != 2:
+                return (
+                    "USAGE: "
+                    "LIST_PENDING token"
+                )
+        
+            token = parts[1]
+        
+            session = (
+                self.require_auth(
+                    token
+                )
+            )
+        
+            if not session:
+                return (
+                    "INVALID_TOKEN"
+                )
+        
+            if (
+                session["role"]
+                != "manager"
+                and
+                session["role"]
+                != "admin"
+            ):
+                return (
+                    "PERMISSION_DENIED"
+                )
+        
+            rows = (
+                self.document_service
+                .list_pending(
+                    session[
+                        "department_id"
+                    ]
+                )
+            )
+        
+            if len(rows) == 0:
+                return (
+                    "NO_PENDING_DOCUMENT"
+                )
+        
+            response = []
+        
+            for row in rows:
+            
+                response.append(
+                    f"{row['id']}|"
+                    f"{row['filename']}|"
+                    f"{row['username']}|"
+                    f"{row['status']}"
+                )
+        
+            return "\n".join(
+                response
+            )
 
         return (
             "UNKNOWN_COMMAND"
         )
+    
+    def require_auth(
+        self,
+        token
+    ):
+
+        session = (
+            self.auth_service
+            .get_session(token)
+        )
+
+        if not session:
+            return None
+
+        return session

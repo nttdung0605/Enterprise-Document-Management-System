@@ -91,3 +91,12 @@ class AuthService:
         return (
             token in self.sessions
         )
+    
+    def get_session(
+        self,
+        token
+    ):
+    
+        return self.sessions.get(
+            token
+        )
