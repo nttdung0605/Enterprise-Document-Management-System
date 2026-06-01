@@ -17,6 +17,11 @@ public:
 
     void startCLI();
 
+    void uploadFile(
+        const std::string& token,
+        const std::string& path
+    );
+
 private:
     SOCKET sock;
 };

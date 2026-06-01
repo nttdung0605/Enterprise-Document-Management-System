@@ -63,6 +63,9 @@ class TCPServer:
     ):
 
         try:
+            self.current_client = (
+                client_socket
+            )
 
             while True:
 
@@ -173,49 +176,48 @@ class TCPServer:
         elif command == "HELP":
 
             return (
-                "LOGIN username password\n"
-                "LOGOUT token"
+                "LOGIN\n"
+                "LOGOUT\n"
+                "UPLOAD\n"
+                "LIST_PENDING\n"
+                "APPROVE\n"
+                "DOWNLOAD"
             )
     
-        elif command == "UPLOAD":
-                
-            if len(parts) != 3:
+        elif command == "UPLOAD":       
+
+            if len(parts) != 4:
                 return (
                     "USAGE: "
-                    "UPLOAD token filename"
-                )
-        
+                    "UPLOAD token "
+                    "filename filesize"
+                )       
+
             token = parts[1]
             filename = parts[2]
-        
+            filesize = int(
+                parts[3]
+            )       
+
             session = (
                 self.require_auth(
                     token
                 )
-            )
-        
+            )       
+
             if not session:
                 return (
                     "INVALID_TOKEN"
-                )
-        
-            success = (
-                self.document_service
-                .upload_document(
+                )       
+
+            return (
+                self.handle_upload(
                     filename,
+                    filesize,
                     session
                 )
-            )
-        
-            if success:
-                return (
-                    "UPLOAD_SUCCESS|PENDING"
-                )
-        
-            return (
-                "UPLOAD_FAILED"
-            )
-        
+            ) 
+
         elif command == "LIST_PENDING":
                 
             if len(parts) != 2:
@@ -376,45 +378,89 @@ class TCPServer:
             return error
 
         elif command == "DOWNLOAD":
-                
+
             if len(parts) != 3:
                 return (
                     "USAGE: "
                     "DOWNLOAD token version_id"
                 )
-        
+
             token = parts[1]
             version_id = parts[2]
-        
+
             session = (
                 self.require_auth(
                     token
                 )
             )
-        
+
             if not session:
                 return (
                     "INVALID_TOKEN"
                 )
-        
+
             success, error = (
                 self.document_service
                 .can_download(
                     version_id
                 )
             )
-        
+
             if success:
                 return (
                     "DOWNLOAD_ALLOWED"
                 )
-        
+
             return error
 
         return (
             "UNKNOWN_COMMAND"
         )
-    
+
+    def handle_upload(
+        self,
+        filename,
+        filesize,
+        session
+    ):
+
+        self.current_client.send(
+            b"READY_UPLOAD"
+        )
+
+        received = b""
+
+        while len(received) < filesize:
+
+            chunk = (
+                self.current_client.recv(
+                    4096
+                )
+            )
+
+            if not chunk:
+                break
+
+            received += chunk
+
+        success = (
+            self.document_service
+            .upload_binary_document(
+                filename,
+                received,
+                session
+            )
+        )
+
+        if success:
+            return (
+                "UPLOAD_SUCCESS|PENDING"
+            )
+
+        return (
+            "UPLOAD_FAILED"
+        )
+
     def require_auth(
         self,
         token

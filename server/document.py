@@ -2,12 +2,24 @@ from db.database import (
     Database
 )
 
+import os
+import uuid
+import hashlib
 
 class DocumentService:
 
     def __init__(self):
 
         self.db = Database()
+
+        self.storage_path = (
+            "storage/encrypted"
+        )
+
+        os.makedirs(
+            self.storage_path,
+            exist_ok=True
+        )
 
     def upload_document(
         self,
@@ -92,6 +104,184 @@ class DocumentService:
 
         finally:
 
+            conn.close()
+
+    def upload_binary_document(
+        self,
+        filename,
+        file_bytes,
+        session
+    ):
+    
+        conn = (
+            self.db.get_connection()
+        )
+    
+        cursor = conn.cursor()
+    
+        saved_path = None
+    
+        try:
+        
+            unique_name = (
+                str(uuid.uuid4())
+                + ".bin"
+            )
+    
+            saved_path = os.path.join(
+                self.storage_path,
+                unique_name
+            )
+    
+            with open(
+                saved_path,
+                "wb"
+            ) as file:
+    
+                file.write(
+                    file_bytes
+                )
+    
+            checksum = hashlib.sha256(
+                file_bytes
+            ).hexdigest()
+    
+            filesize = len(
+                file_bytes
+            )
+    
+            cursor.execute(
+                """
+                SELECT id
+                FROM documents
+                WHERE filename=?
+                AND department_id=?
+                """,
+                (
+                    filename,
+                    session[
+                        "department_id"
+                    ]
+                )
+            )
+    
+            doc = (
+                cursor.fetchone()
+            )
+    
+            if doc:
+            
+                document_id = (
+                    doc["id"]
+                )
+    
+                cursor.execute(
+                    """
+                    SELECT
+                    MAX(version_num)
+                    AS max_ver
+                    FROM
+                    document_versions
+                    WHERE document_id=?
+                    """,
+                    (document_id,)
+                )
+    
+                row = (
+                    cursor.fetchone()
+                )
+    
+                version = (
+                    row["max_ver"] + 1
+                    if row["max_ver"]
+                    else 1
+                )
+    
+            else:
+            
+                cursor.execute(
+                    """
+                    INSERT INTO
+                    documents
+                    (
+                        filename,
+                        department_id
+                    )
+                    VALUES (?,?)
+                    """,
+                    (
+                        filename,
+                        session[
+                            "department_id"
+                        ]
+                    )
+                )
+    
+                document_id = (
+                    cursor.lastrowid
+                )
+    
+                version = 1
+    
+            cursor.execute(
+                """
+                INSERT INTO
+                document_versions
+                (
+                    document_id,
+                    version_num,
+                    uploaded_by,
+                    filepath,
+                    filesize,
+                    checksum,
+                    status
+                )
+                VALUES
+                (
+                    ?,?,?,?,?,?,
+                    'pending'
+                )
+                """,
+                (
+                    document_id,
+                    version,
+                    session[
+                        "user_id"
+                    ],
+                    saved_path,
+                    filesize,
+                    checksum
+                )
+            )
+    
+            conn.commit()
+    
+            return True
+    
+        except Exception as e:
+        
+            conn.rollback()
+    
+            if (
+                saved_path
+                and
+                os.path.exists(
+                    saved_path
+                )
+            ):
+                os.remove(
+                    saved_path
+                )
+    
+            print(
+                "[UPLOAD ERROR]",
+                e
+            )
+    
+            return False
+    
+        finally:
+        
             conn.close()
 
     def list_pending(
