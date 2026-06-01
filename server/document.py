@@ -136,3 +136,143 @@ class DocumentService:
         conn.close()
 
         return rows
+    
+    def update_status(
+        self,
+        version_id,
+        status,
+        session
+    ):
+
+        conn = (
+            self.db.get_connection()
+        )
+
+        cursor = conn.cursor()
+
+        try:
+
+            cursor.execute(
+                """
+                SELECT
+                    dv.id,
+                    d.department_id
+                FROM
+                document_versions dv
+                JOIN documents d
+                ON d.id=dv.document_id
+                WHERE dv.id=?
+                """,
+                (version_id,)
+            )
+
+            row = cursor.fetchone()
+
+            if not row:
+                conn.close()
+                return (
+                    False,
+                    "VERSION_NOT_FOUND"
+                )
+
+            if (
+                session["role"]
+                != "admin"
+                and
+                row["department_id"]
+                != session[
+                    "department_id"
+                ]
+            ):
+                conn.close()
+
+                return (
+                    False,
+                    "PERMISSION_DENIED"
+                )
+
+            cursor.execute(
+                """
+                UPDATE
+                document_versions
+                SET status=?
+                WHERE id=?
+                """,
+                (
+                    status,
+                    version_id
+                )
+            )
+
+            conn.commit()
+
+            return (
+                True,
+                None
+            )
+
+        except Exception as e:
+
+            conn.rollback()
+
+            print(
+                "[STATUS ERROR]",
+                e
+            )
+
+            return (
+                False,
+                "UPDATE_FAILED"
+            )
+
+        finally:
+
+            conn.close()
+
+    def can_download(
+        self,
+        version_id
+    ):  
+
+        conn = (
+            self.db.get_connection()
+        )   
+
+        cursor = conn.cursor()  
+
+        cursor.execute(
+            """
+            SELECT
+                status
+            FROM
+            document_versions
+            WHERE id=?
+            """,
+            (version_id,)
+        )   
+
+        row = (
+            cursor.fetchone()
+        )   
+
+        conn.close()    
+
+        if not row:
+            return (
+                False,
+                "VERSION_NOT_FOUND"
+            )   
+
+        if (
+            row["status"]
+            != "approved"
+        ):
+            return (
+                False,
+                "DOCUMENT_NOT_APPROVED"
+            )   
+
+        return (
+            True,
+            None
+        )

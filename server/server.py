@@ -277,6 +277,140 @@ class TCPServer:
                 response
             )
 
+        elif command == "APPROVE":
+
+            if len(parts) != 3:
+                return (
+                    "USAGE: "
+                    "APPROVE token version_id"
+                )
+
+            token = parts[1]
+            version_id = parts[2]
+
+            session = (
+                self.require_auth(
+                    token
+                )
+            )
+
+            if not session:
+                return (
+                    "INVALID_TOKEN"
+                )
+
+            if (
+                session["role"]
+                not in [
+                    "manager",
+                    "admin"
+                ]
+            ):
+                return (
+                    "PERMISSION_DENIED"
+                )
+
+            success, error = (
+                self.document_service
+                .update_status(
+                    version_id,
+                    "approved",
+                    session
+                )
+            )
+
+            if success:
+                return (
+                    "APPROVE_SUCCESS"
+                )
+
+            return error
+
+        elif command == "REJECT":
+
+            if len(parts) != 3:
+                return (
+                    "USAGE: "
+                    "REJECT token version_id"
+                )
+
+            token = parts[1]
+            version_id = parts[2]
+
+            session = (
+                self.require_auth(
+                    token
+                )
+            )
+
+            if not session:
+                return (
+                    "INVALID_TOKEN"
+                )
+
+            if (
+                session["role"]
+                not in [
+                    "manager",
+                    "admin"
+                ]
+            ):
+                return (
+                    "PERMISSION_DENIED"
+                )
+
+            success, error = (
+                self.document_service
+                .update_status(
+                    version_id,
+                    "rejected",
+                    session
+                )
+            )
+
+            if success:
+                return (
+                    "REJECT_SUCCESS"
+                )
+
+            return error
+
+        elif command == "DOWNLOAD":
+                
+            if len(parts) != 3:
+                return (
+                    "USAGE: "
+                    "DOWNLOAD token version_id"
+                )
+        
+            token = parts[1]
+            version_id = parts[2]
+        
+            session = (
+                self.require_auth(
+                    token
+                )
+            )
+        
+            if not session:
+                return (
+                    "INVALID_TOKEN"
+                )
+        
+            success, error = (
+                self.document_service
+                .can_download(
+                    version_id
+                )
+            )
+        
+            if success:
+                return (
+                    "DOWNLOAD_ALLOWED"
+                )
+        
+            return error
+
         return (
             "UNKNOWN_COMMAND"
         )
