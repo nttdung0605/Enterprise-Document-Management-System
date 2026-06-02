@@ -1,6 +1,4 @@
-from db.database import (
-    Database
-)
+import db.database
 
 import os
 import uuid
@@ -10,7 +8,7 @@ class DocumentService:
 
     def __init__(self):
 
-        self.db = Database()
+        self.db = db.database.Database()
 
         self.storage_path = (
             "storage/encrypted"
@@ -327,6 +325,49 @@ class DocumentService:
 
         return rows
     
+    def list_available(
+        self,
+        department_id
+    ):
+
+        conn = (
+            self.db.get_connection()
+        )
+
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                dv.id,
+                d.filename,
+                u.username,
+                dv.status
+            FROM
+            document_versions dv
+
+            JOIN documents d
+            ON d.id = dv.document_id
+
+            JOIN users u
+            ON u.id = dv.uploaded_by
+
+            WHERE
+            dv.status='approved'
+            AND
+            d.department_id=?
+            """,
+            (department_id,)
+        )
+
+        rows = (
+            cursor.fetchall()
+        )
+
+        conn.close()
+
+        return rows
+    
     def update_status(
         self,
         version_id,
@@ -471,19 +512,20 @@ class DocumentService:
         self,
         version_id
     ):
-    
+
         conn = (
             self.db.get_connection()
         )
-    
+
         cursor = conn.cursor()
-    
+
         cursor.execute(
             """
             SELECT
                 dv.filepath,
                 dv.filesize,
                 dv.status,
+                dv.checksum,
                 d.filename
             FROM
                 document_versions dv
@@ -496,19 +538,19 @@ class DocumentService:
             """,
             (version_id,)
         )
-    
+
         row = (
             cursor.fetchone()
         )
-    
+
         conn.close()
-    
+
         if not row:
             return (
                 False,
                 "VERSION_NOT_FOUND"
             )
-    
+
         if (
             row["status"]
             != "approved"
@@ -517,17 +559,22 @@ class DocumentService:
                 False,
                 "DOCUMENT_NOT_APPROVED"
             )
-    
+
         return (
             True,
             {
                 "filepath":
-                row["filepath"],
-    
+                    row["filepath"],
+
                 "filename":
-                row["filename"],
-    
+                    row["filename"],
+
                 "filesize":
-                row["filesize"]
+                    row["filesize"],
+
+                "checksum":
+                    row["checksum"]
             }
         )
+    
+    

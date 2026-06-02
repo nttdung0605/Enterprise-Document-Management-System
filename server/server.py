@@ -1,7 +1,9 @@
 import socket
 
-from auth import AuthService
-from document import DocumentService
+import auth
+import document
+
+import hashlib
 
 class TCPServer:
 
@@ -15,11 +17,11 @@ class TCPServer:
         self.port = port
 
         self.auth_service = (
-            AuthService()
+            auth.AuthService()
         )
 
         self.document_service = (
-            DocumentService()
+            document.DocumentService()
         )
 
     def start(self):
@@ -180,6 +182,7 @@ class TCPServer:
                 "LOGOUT\n"
                 "UPLOAD\n"
                 "LIST_PENDING\n"
+                "LIST_AVAILABLE\n"
                 "APPROVE\n"
                 "DOWNLOAD"
             )
@@ -275,6 +278,56 @@ class TCPServer:
                     f"{row['status']}"
                 )
         
+            return "\n".join(
+                response
+            )
+
+        elif command == "LIST_AVAILABLE":
+
+            if len(parts) != 2:
+                return (
+                    "USAGE: "
+                    "LIST_AVAILABLE token"
+                )
+
+            token = parts[1]
+
+            session = (
+                self.require_auth(
+                    token
+                )
+            )
+
+            if not session:
+                return (
+                    "INVALID_TOKEN"
+                )
+
+            rows = (
+                self.document_service
+                .list_available(
+                    session[
+                        "department_id"
+                    ]
+                )
+            )
+
+            if len(rows) == 0:
+                return (
+                    "NO_AVAILABLE_DOCUMENT"
+                )
+
+            response = []
+
+            for row in rows:
+            
+                response.append(
+                    f"{row['id']}|"
+                    f"{row['filename']}|"
+                    f"{row['username']}|"
+                    f"{row['status']}"
+                )
+
             return "\n".join(
                 response
             )
@@ -457,58 +510,84 @@ class TCPServer:
         self,
         version_id
     ):
-
+    
         success, result = (
             self.document_service
             .get_download_file(
                 version_id
             )
         )
-
+    
         if not success:
             return result
-
+    
         filepath = (
             result["filepath"]
         )
-
+    
         filename = (
             result["filename"]
         )
-
+    
         filesize = (
             result["filesize"]
         )
-
-        self.current_client.send(
-            (
-                f"READY_DOWNLOAD "
-                f"{filename} "
-                f"{filesize}"
-            ).encode()
+    
+        expected_checksum = (
+            result["checksum"]
         )
-
-        with open(
-            filepath,
-            "rb"
-        ) as file:
-
-            while True:
-
-                chunk = file.read(
-                    4096
+    
+        try:
+        
+            with open(
+                filepath,
+                "rb"
+            ) as file:
+    
+                file_bytes = (
+                    file.read()
                 )
-
-                if not chunk:
-                    break
-
-                self.current_client.send(
-                    chunk
+    
+            actual_checksum = (
+                hashlib.sha256(
+                    file_bytes
+                ).hexdigest()
+            )
+    
+            if (
+                actual_checksum
+                != expected_checksum
+            ):
+                return (
+                    "FILE_CORRUPTED"
                 )
-
-        return (
-            "DOWNLOAD_SUCCESS"
-        )
+    
+            self.current_client.send(
+                (
+                    f"READY_DOWNLOAD "
+                    f"{filename} "
+                    f"{filesize}"
+                ).encode()
+            )
+    
+            self.current_client.send(
+                file_bytes
+            )
+    
+            return (
+                "DOWNLOAD_SUCCESS"
+            )
+    
+        except Exception as e:
+        
+            print(
+                "[DOWNLOAD ERROR]",
+                e
+            )
+    
+            return (
+                "DOWNLOAD_FAILED"
+            )
 
     def require_auth(
         self,
