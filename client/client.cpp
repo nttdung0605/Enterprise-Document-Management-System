@@ -11,6 +11,7 @@
 
 #include <sstream>
 #include <vector>
+#include <algorithm>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -132,6 +133,54 @@ void Client::startCLI()
         
             uploadFile(
                 token,
+                path
+            );
+        
+            continue;
+        }
+
+        if (
+            command.rfind(
+                "DOWNLOAD_FILE",
+                0
+            ) == 0
+        )
+        {
+            std::stringstream ss(
+                command
+            );
+        
+            std::string cmd;
+            std::string token;
+            int versionId;
+        
+            ss
+            >> cmd
+            >> token
+            >> versionId;
+        
+            std::string path;
+        
+            std::getline(
+                ss,
+                path
+            );
+        
+            if (
+                !path.empty()
+                &&
+                path[0] == ' '
+            )
+            {
+                path.erase(
+                    0,
+                    1
+                );
+            }
+        
+            downloadFile(
+                token,
+                versionId,
                 path
             );
         
@@ -278,4 +327,105 @@ void Client::uploadFile(
     std::cout
         << buffer
         << "\n";
+}
+
+void Client::downloadFile(
+    const std::string& token,
+    int versionId,
+    const std::string& saveFolder
+)
+{
+    std::string command =
+        "DOWNLOAD "
+        + token
+        + " "
+        + std::to_string(
+            versionId
+        );
+
+    send(
+        sock,
+        command.c_str(),
+        command.size(),
+        0
+    );
+
+    char buffer[4096] = {0};
+
+    int hdrBytes = recv(
+        sock,
+        buffer,
+        sizeof(buffer),
+        0
+    );
+
+    if (hdrBytes <= 0)
+    {
+        std::cout << "No response from server\n";
+        return;
+    }
+
+    std::string response(buffer, hdrBytes);
+
+    if (response.find("READY_DOWNLOAD") != 0)
+    {
+        std::cout << response << "\n";
+        return;
+    }
+
+    std::stringstream ss(response);
+
+    std::string status;
+    std::string filename;
+    int filesize;
+
+    ss >> status >> filename >> filesize;
+
+    std::string savePath = saveFolder + "\\" + filename;
+
+    std::ofstream file(savePath, std::ios::binary);
+
+    int received = 0;
+    std::string leftoverMsg;
+
+    while (received < filesize)
+    {
+        int bytes = recv(sock, buffer, sizeof(buffer), 0);
+
+        if (bytes <= 0)
+            break;
+
+        int toWrite = bytes;
+
+        if (received + toWrite > filesize)
+        {
+            toWrite = filesize - received;
+            leftoverMsg.assign(buffer + toWrite, bytes - toWrite);
+        }
+
+        file.write(buffer, toWrite);
+        received += toWrite;
+    }
+
+    file.close();
+
+    std::string finalResponse;
+
+    if (!leftoverMsg.empty())
+    {
+        finalResponse = leftoverMsg;
+    }
+    else
+    {
+        memset(buffer, 0, sizeof(buffer));
+        int r = recv(sock, buffer, sizeof(buffer), 0);
+        if (r > 0)
+            finalResponse.assign(buffer, r);
+    }
+
+    while (!finalResponse.empty() && (finalResponse.back() == '\0' || finalResponse.back() == '\n' || finalResponse.back() == '\r'))
+        finalResponse.pop_back();
+
+    std::cout << finalResponse << "\n";
+    std::cout << "Saved to: " << savePath << "\n";
 }

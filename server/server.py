@@ -399,19 +399,11 @@ class TCPServer:
                     "INVALID_TOKEN"
                 )
 
-            success, error = (
-                self.document_service
-                .can_download(
+            return (
+                self.handle_download(
                     version_id
                 )
             )
-
-            if success:
-                return (
-                    "DOWNLOAD_ALLOWED"
-                )
-
-            return error
 
         return (
             "UNKNOWN_COMMAND"
@@ -459,6 +451,63 @@ class TCPServer:
 
         return (
             "UPLOAD_FAILED"
+        )
+
+    def handle_download(
+        self,
+        version_id
+    ):
+
+        success, result = (
+            self.document_service
+            .get_download_file(
+                version_id
+            )
+        )
+
+        if not success:
+            return result
+
+        filepath = (
+            result["filepath"]
+        )
+
+        filename = (
+            result["filename"]
+        )
+
+        filesize = (
+            result["filesize"]
+        )
+
+        self.current_client.send(
+            (
+                f"READY_DOWNLOAD "
+                f"{filename} "
+                f"{filesize}"
+            ).encode()
+        )
+
+        with open(
+            filepath,
+            "rb"
+        ) as file:
+
+            while True:
+
+                chunk = file.read(
+                    4096
+                )
+
+                if not chunk:
+                    break
+
+                self.current_client.send(
+                    chunk
+                )
+
+        return (
+            "DOWNLOAD_SUCCESS"
         )
 
     def require_auth(

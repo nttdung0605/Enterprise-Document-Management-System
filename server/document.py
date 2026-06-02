@@ -466,3 +466,68 @@ class DocumentService:
             True,
             None
         )
+    
+    def get_download_file(
+        self,
+        version_id
+    ):
+    
+        conn = (
+            self.db.get_connection()
+        )
+    
+        cursor = conn.cursor()
+    
+        cursor.execute(
+            """
+            SELECT
+                dv.filepath,
+                dv.filesize,
+                dv.status,
+                d.filename
+            FROM
+                document_versions dv
+            JOIN
+                documents d
+            ON
+                d.id=dv.document_id
+            WHERE
+                dv.id=?
+            """,
+            (version_id,)
+        )
+    
+        row = (
+            cursor.fetchone()
+        )
+    
+        conn.close()
+    
+        if not row:
+            return (
+                False,
+                "VERSION_NOT_FOUND"
+            )
+    
+        if (
+            row["status"]
+            != "approved"
+        ):
+            return (
+                False,
+                "DOCUMENT_NOT_APPROVED"
+            )
+    
+        return (
+            True,
+            {
+                "filepath":
+                row["filepath"],
+    
+                "filename":
+                row["filename"],
+    
+                "filesize":
+                row["filesize"]
+            }
+        )

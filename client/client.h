@@ -22,6 +22,12 @@ public:
         const std::string& path
     );
 
+    void downloadFile(
+        const std::string& token,
+        int versionId,
+        const std::string& saveFolder
+    );
+
 private:
     SOCKET sock;
 };
