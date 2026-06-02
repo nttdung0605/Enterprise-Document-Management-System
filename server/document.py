@@ -254,7 +254,16 @@ class DocumentService:
     
             conn.commit()
     
-            return True
+            version_id = (
+                cursor.lastrowid
+            )
+
+            conn.commit()
+
+            return (
+                True,
+                version_id
+            )
     
         except Exception as e:
         
@@ -276,7 +285,10 @@ class DocumentService:
                 e
             )
     
-            return False
+            return (
+                False,
+                None
+            )
     
         finally:
         

@@ -5,6 +5,8 @@ import document
 
 import hashlib
 
+import audit
+
 class TCPServer:
 
     def __init__(
@@ -22,6 +24,10 @@ class TCPServer:
 
         self.document_service = (
             document.DocumentService()
+        )
+
+        self.audit_service = (
+            audit.AuditService()
         )
 
     def start(self):
@@ -56,12 +62,14 @@ class TCPServer:
             )
 
             self.handle_client(
-                client_socket
+                client_socket,
+                addr
             )
 
     def handle_client(
         self,
-        client_socket
+        client_socket,
+        address
     ):
 
         try:
@@ -70,6 +78,10 @@ class TCPServer:
             )
 
             while True:
+
+                self.client_ip = (
+                    address[0]
+                )
 
                 data = (
                     client_socket.recv(
@@ -375,6 +387,13 @@ class TCPServer:
             )
 
             if success:
+                self.audit_service.log_action(
+                    "APPROVE",
+                    session["user_id"],
+                    int(version_id),
+                    self.client_ip
+                )
+
                 return (
                     "APPROVE_SUCCESS"
                 )
@@ -424,6 +443,13 @@ class TCPServer:
             )
 
             if success:
+                self.audit_service.log_action(
+                    "REJECT",
+                    session["user_id"],
+                    int(version_id),
+                    self.client_ip
+                )
+
                 return (
                     "REJECT_SUCCESS"
                 )
@@ -454,8 +480,61 @@ class TCPServer:
 
             return (
                 self.handle_download(
-                    version_id
+                    version_id,
+                    session
                 )
+            )
+
+        elif command == "LIST_AUDIT":
+
+            if len(parts) != 2:
+                return (
+                    "USAGE: "
+                    "LIST_AUDIT token"
+                )
+
+            token = parts[1]
+
+            session = (
+                self.require_auth(
+                    token
+                )
+            )
+
+            if not session:
+                return (
+                    "INVALID_TOKEN"
+                )
+
+            if (
+                session["role"]
+                != "admin"
+            ):
+                return (
+                    "PERMISSION_DENIED"
+                )
+
+            rows = (
+                self.audit_service
+                .get_logs()
+            )
+
+            response = []
+
+            for row in rows:
+            
+                response.append(
+                    f"{row['id']}|"
+                    f"{row['action']}|"
+                    f"{row['username']}|"
+                    f"version="
+                    f"{row['version_id']}|"
+                    f"{row['client_ip']}|"
+                    f"{row['action_time']}"
+                )
+
+            return "\n".join(
+                response
             )
 
         return (
@@ -488,7 +567,7 @@ class TCPServer:
 
             received += chunk
 
-        success = (
+        success, version_id = (
             self.document_service
             .upload_binary_document(
                 filename,
@@ -498,6 +577,13 @@ class TCPServer:
         )
 
         if success:
+            self.audit_service.log_action(
+                "UPLOAD",
+                session["user_id"],
+                version_id,
+                self.client_ip
+            )
+
             return (
                 "UPLOAD_SUCCESS|PENDING"
             )
@@ -508,7 +594,8 @@ class TCPServer:
 
     def handle_download(
         self,
-        version_id
+        version_id,
+        session
     ):
     
         success, result = (
@@ -574,6 +661,13 @@ class TCPServer:
                 file_bytes
             )
     
+            self.audit_service.log_action(
+                "DOWNLOAD",
+                session["user_id"],
+                int(version_id),
+                self.client_ip
+            )
+
             return (
                 "DOWNLOAD_SUCCESS"
             )
