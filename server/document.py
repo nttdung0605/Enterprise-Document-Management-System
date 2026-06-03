@@ -380,6 +380,46 @@ class DocumentService:
 
         return rows
     
+    def list_versions(
+        self,
+        filename,
+        department_id
+    ):
+    
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+    
+        cursor.execute(
+            """
+            SELECT
+                dv.id,
+                dv.version_num,
+                dv.status,
+                dv.upload_time,
+                u.username
+            FROM document_versions dv
+            JOIN documents d
+                ON d.id = dv.document_id
+            JOIN users u
+                ON u.id = dv.uploaded_by
+            WHERE
+                d.filename = ?
+                AND d.department_id = ?
+            ORDER BY
+                dv.version_num DESC
+            """,
+            (
+                filename,
+                department_id
+            )
+        )
+    
+        rows = cursor.fetchall()
+    
+        conn.close()
+    
+        return rows
+
     def update_status(
         self,
         version_id,

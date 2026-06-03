@@ -537,6 +537,55 @@ class TCPServer:
                 response
             )
 
+        elif command == "LIST_VERSIONS":
+                
+            if len(parts) != 3:
+                return (
+                    "USAGE: "
+                    "LIST_VERSIONS token filename"
+                )
+        
+            token = parts[1]
+            filename = parts[2]
+        
+            session = self.require_auth(
+                token
+            )
+        
+            if not session:
+                return "INVALID_TOKEN"
+        
+            rows = (
+                self.document_service
+                .list_versions(
+                    filename,
+                    session[
+                        "department_id"
+                    ]
+                )
+            )
+        
+            if not rows:
+                return (
+                    "NO_VERSIONS_FOUND"
+                )
+        
+            response = []
+        
+            for row in rows:
+            
+                response.append(
+                    f"v{row['version_num']}|"
+                    f"id={row['id']}|"
+                    f"{row['status']}|"
+                    f"{row['username']}|"
+                    f"{row['upload_time']}"
+                )
+        
+            return "\n".join(
+                response
+            )
+
         return (
             "UNKNOWN_COMMAND"
         )
