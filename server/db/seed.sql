@@ -45,3 +45,8 @@ VALUES
     2,
     134217728
 );
+
+UPDATE users
+SET
+personal_quota_max = 1000
+WHERE username='staff_it';

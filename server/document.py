@@ -4,9 +4,12 @@ import os
 import uuid
 import hashlib
 
+import quota
+
 class DocumentService:
 
     def __init__(self):
+        self.quota_service = quota.QuotaService()
 
         self.db = db.database.Database()
 
@@ -147,6 +150,25 @@ class DocumentService:
             filesize = len(
                 file_bytes
             )
+
+            personal_ok = self.quota_service.check_user_quota(
+                    session["user_id"],
+                    filesize
+                )
+            
+            department_ok = self.quota_service.check_department_quota(
+                    session["department_id"],
+                    filesize
+                )
+            
+            if not personal_ok:
+                raise Exception(
+                    "User quota exceeded"
+                )
+            if not department_ok:
+                raise Exception(
+                    "Department quota exceeded"
+                )
     
             cursor.execute(
                 """
@@ -251,9 +273,35 @@ class DocumentService:
                     checksum
                 )
             )
-    
-            conn.commit()
-    
+
+            cursor.execute(
+                """
+                UPDATE users
+                SET personal_quota_used = personal_quota_used + ?
+                WHERE id=?
+                """,
+                (
+                    filesize,
+                    session[
+                        "user_id"
+                    ]
+                )
+            )
+
+            cursor.execute(
+                """
+                UPDATE departments
+                SET quota_used = quota_used + ?
+                WHERE id=?
+                """,
+                (
+                    filesize,
+                    session[
+                        "department_id"
+                    ]
+                )
+            )
+
             version_id = (
                 cursor.lastrowid
             )
