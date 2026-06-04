@@ -132,7 +132,7 @@ Upload (multi-step):
 
 ```mermaid
 sequenceDiagram
-		Client->>Server: UPLOAD <token> <filename> <filesize>
+		Client->>Server: UPLOAD <token> <filename> <filepath>
 		Server-->>Client: READY_UPLOAD
 		Client->>Server: [raw file bytes ... filesize bytes]
 		Server-->>Client: READY_CHECKSUM
@@ -149,7 +149,7 @@ Download:
 
 ```mermaid
 sequenceDiagram
-		Client->>Server: DOWNLOAD <token> <version_id>
+		Client->>Server: DOWNLOAD <token> <version_id> <path>
 		Server->>DocumentService: get_download_file(version_id)
 		DocumentService->>DB: select version, filepath
 		DocumentService-->>Server: {filepath, filename, filesize, checksum}
