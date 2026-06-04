@@ -7,6 +7,9 @@ import hashlib
 
 import audit
 
+import os
+import uuid
+
 from crypto import (
     decrypt_data
 )
@@ -196,11 +199,11 @@ class TCPServer:
             return (
                 "LOGIN\n"
                 "LOGOUT\n"
-                "UPLOAD\n"
+                "UPLOAD_FILE\n"
                 "LIST_PENDING\n"
                 "LIST_AVAILABLE\n"
                 "APPROVE\n"
-                "DOWNLOAD"
+                "DOWNLOAD_FILE"
             )
     
         elif command == "UPLOAD":       
@@ -601,45 +604,163 @@ class TCPServer:
         session
     ):
 
+        temp_filename = (
+            str(uuid.uuid4())
+            + ".tmp"
+        )
+
+        temp_path = os.path.join(
+            "storage",
+            "temp",
+            temp_filename
+        )
+
         self.current_client.send(
             b"READY_UPLOAD"
         )
 
-        received = b""
+        with open(
+            temp_path,
+            "wb"
+        ) as temp_file:
 
-        while len(received) < filesize:
+            bytes_received = 0
 
-            chunk = (
-                self.current_client.recv(
+            while (
+                bytes_received
+                < filesize
+            ):
+                
+                chunk = (
+                    self.current_client.recv(
+                        4096
+                    )
+                )
+
+                if not chunk:
+                    break
+                
+                temp_file.write(
+                    chunk
+                )
+
+                bytes_received += len(
+                    chunk
+                )
+            
+            if bytes_received != filesize:
+
+                    if os.path.exists(
+                        temp_path
+                    ):
+                        os.remove(
+                            temp_path
+                        )
+
+                    return (
+                        "UPLOAD_INCOMPLETE"
+                    )
+
+        sha256 = hashlib.sha256()
+
+        with open(
+            temp_path,
+            "rb"
+        ) as f:
+
+            while True:
+            
+                chunk = f.read(
                     4096
                 )
+
+                if not chunk:
+                    break
+                
+                sha256.update(
+                    chunk
+                )
+
+        server_checksum = sha256.hexdigest()
+
+        self.current_client.send(
+            b"READY_CHECKSUM"
+        )
+    
+        checksum_msg = (
+            self.current_client.recv(
+                1024
+            )
+            .decode()
+            .strip()
+        )
+
+        print(
+            "[SERVER]",
+            checksum_msg
+        )
+
+        if not checksum_msg.startswith(
+            "CHECKSUM "
+        ):
+            return (
+                "INVALID_CHECKSUM_FORMAT"
             )
 
-            if not chunk:
-                break
+        client_checksum = (
+            checksum_msg.split(
+                " ",
+                1
+            )[1]
+        )
 
-            received += chunk
+        if (client_checksum != server_checksum):
 
+            print(
+                "[SERVER] Checksum mismatch"
+            )
+
+            os.remove(
+                temp_path
+            )
+
+            return (
+                "CHECKSUM_MISMATCH"
+            )
+        
         success, version_id = (
             self.document_service
             .upload_binary_document(
                 filename,
-                received,
+                temp_path,
                 session
             )
         )
 
-        if success:
-            self.audit_service.log_action(
-                "UPLOAD",
-                session["user_id"],
-                version_id,
-                self.client_ip
-            )
+        try:
+            if success:
+                self.audit_service.log_action(
+                    "UPLOAD",
+                    session["user_id"],
+                    version_id,
+                    self.client_ip
+                )
 
-            return (
-                "UPLOAD_SUCCESS|PENDING"
-            )
+                os.remove(
+                    temp_path
+                )
+
+                return (
+                    "UPLOAD_SUCCESS|PENDING"
+                )
+        finally:
+
+            if os.path.exists(
+                temp_path
+            ):
+                os.remove(
+                    temp_path
+                )
 
         return (
             "UPLOAD_FAILED"

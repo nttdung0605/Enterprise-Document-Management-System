@@ -315,6 +315,35 @@ void Client::uploadFile(
         0
     );
 
+        memset(
+        buffer,
+        0,
+        sizeof(buffer)
+    );
+
+    recv(
+        sock,
+        buffer,
+        sizeof(buffer),
+        0
+    );
+
+    std::string serverResponse =
+        buffer;
+
+    if (
+        serverResponse
+        != "READY_CHECKSUM"
+    )
+    {
+        std::cout
+            << "Unexpected response: "
+            << serverResponse
+            << "\n";
+
+        return;
+    }
+    
     std::string checksum =
         calculateSHA256(
             path
@@ -323,7 +352,7 @@ void Client::uploadFile(
     std::string checksumCmd =
         "CHECKSUM "
         + checksum;
-    
+
     send(
         sock,
         checksumCmd.c_str(),

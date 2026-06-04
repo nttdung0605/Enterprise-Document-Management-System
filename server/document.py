@@ -114,7 +114,7 @@ class DocumentService:
     def upload_binary_document(
         self,
         filename,
-        file_bytes,
+        temp_path,
         session
     ):
     
@@ -127,7 +127,7 @@ class DocumentService:
         saved_path = None
     
         try:
-        
+
             unique_name = (
                 str(uuid.uuid4())
                 + ".bin"
@@ -139,24 +139,16 @@ class DocumentService:
             )
     
             with open(
-                saved_path,
-                "wb"
-            ) as file:
-    
-                encrypted_bytes = (
-                    encrypt_data(
-                        file_bytes
-                    )
-                )
+                temp_path,
+                "rb"
+            ) as src:
 
-                file.write(
-                    encrypted_bytes
-                )
-    
+                file_bytes = src.read()
+
             checksum = hashlib.sha256(
                 file_bytes
             ).hexdigest()
-    
+
             filesize = len(
                 file_bytes
             )
@@ -178,6 +170,21 @@ class DocumentService:
             if not department_ok:
                 raise Exception(
                     "Department quota exceeded"
+                )
+
+            encrypted_bytes = (
+                encrypt_data(
+                    file_bytes
+                )
+            )
+
+            with open(
+                saved_path,
+                "wb"
+            ) as dst:
+
+                dst.write(
+                    encrypted_bytes
                 )
     
             cursor.execute(
