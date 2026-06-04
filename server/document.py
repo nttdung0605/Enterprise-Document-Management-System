@@ -6,6 +6,10 @@ import hashlib
 
 import quota
 
+from crypto import (
+    encrypt_data
+)
+
 class DocumentService:
 
     def __init__(self):
@@ -139,8 +143,14 @@ class DocumentService:
                 "wb"
             ) as file:
     
+                encrypted_bytes = (
+                    encrypt_data(
+                        file_bytes
+                    )
+                )
+
                 file.write(
-                    file_bytes
+                    encrypted_bytes
                 )
     
             checksum = hashlib.sha256(

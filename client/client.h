@@ -28,6 +28,10 @@ public:
         const std::string& saveFolder
     );
 
+    std::string calculateSHA256(
+        const std::string& filepath
+    );
+
 private:
     SOCKET sock;
 };

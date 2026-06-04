@@ -7,6 +7,10 @@ import hashlib
 
 import audit
 
+from crypto import (
+    decrypt_data
+)
+
 class TCPServer:
 
     def __init__(
@@ -680,10 +684,15 @@ class TCPServer:
                 "rb"
             ) as file:
     
-                file_bytes = (
+                encrypted_bytes = (
                     file.read()
                 )
-    
+            
+            file_bytes = (
+                decrypt_data(
+                    encrypted_bytes
+                )
+            )
             actual_checksum = (
                 hashlib.sha256(
                     file_bytes
