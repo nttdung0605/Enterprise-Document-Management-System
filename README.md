@@ -106,9 +106,9 @@ pytest -q
 
 ## **Sơ đồ kiến trúc hệ thống**
 
-````mermaid
+```mermaid
 graph TD
-    Client["Client C/C++"] -->|TCP socket| Server["Python TCP Server"]
+	Client["Client C/C++"] -->|TCP socket| Server["Python TCP Server"]
     Server --> DB["SQLite db/edms.db"]
     Server --> StorageEncrypted["Encrypted storage\nstorage/encrypted"]
     Server --> StorageTemp["Temp storage\nstorage/temp"]
@@ -122,9 +122,7 @@ graph TD
     Auth --> DB
     Doc --> DB
     Quota --> DB
-```​
 ```
-
 
 Sơ đồ: Client kết nối đến Python TCP Server qua socket TCP. Server chia thành các service (`AuthService`, `DocumentService`, `AuditService`, `QuotaService`) và tương tác với SQLite (`db/edms.db`) và bộ nhớ lưu trữ mã hóa (`storage/encrypted`). Mã hóa/giải mã file được thực hiện bởi `server/crypto.py` trước khi lưu/đọc file.
 
