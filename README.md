@@ -103,32 +103,28 @@ pytest -q
 - Staff không được download tài liệu phòng ban khác (tests/test_department_permission.py).
 - Admin xem tất cả tài liệu và audit log (tests/test_admin_access.py, tests/test_quota.py).
 
-## **Lưu ý triển khai & TODO (Production)**
-- Thay `AES_KEY` cố định bằng key từ biến môi trường hoặc dịch vụ quản lý key.
-- Bật TLS (socket TLS) hoặc thực hiện mã hóa end-to-end trên client để bảo vệ truyền tải.
-- Thêm expiry cho session token và cơ chế persist/refresh token.
-- Dùng password hashing an toàn (bcrypt/argon2) thay vì kiểm tra chuỗi thô.
-- Giám sát quota, cleanup files cũ, backup DB.
 
 ## **Sơ đồ kiến trúc hệ thống**
 
-```mermaid
+````mermaid
 graph TD
-	Client[Client C/C++] -->|TCP socket| Server[Python TCP Server]
-	Server --> DB[SQLite (db/edms.db)]
-	Server --> StorageEncrypted[Encrypted storage\nstorage/encrypted]
-	Server --> StorageTemp[Temp storage\nstorage/temp]
-	Server --> Auth[Auth Service]
-	Server --> Doc[Document Service]
-	Server --> Audit[Audit Service]
-	Server --> Quota[Quota Service]
-	Doc --> Crypto[Crypto (AES encrypt/decrypt)]
-	Crypto --> StorageEncrypted
-	Audit --> DB
-	Auth --> DB
-	Doc --> DB
-	Quota --> DB
+    Client["Client C/C++"] -->|TCP socket| Server["Python TCP Server"]
+    Server --> DB["SQLite db/edms.db"]
+    Server --> StorageEncrypted["Encrypted storage\nstorage/encrypted"]
+    Server --> StorageTemp["Temp storage\nstorage/temp"]
+    Server --> Auth["Auth Service"]
+    Server --> Doc["Document Service"]
+    Server --> Audit["Audit Service"]
+    Server --> Quota["Quota Service"]
+    Doc --> Crypto["Crypto (AES encrypt/decrypt)"]
+    Crypto --> StorageEncrypted
+    Audit --> DB
+    Auth --> DB
+    Doc --> DB
+    Quota --> DB
+```​
 ```
+
 
 Sơ đồ: Client kết nối đến Python TCP Server qua socket TCP. Server chia thành các service (`AuthService`, `DocumentService`, `AuditService`, `QuotaService`) và tương tác với SQLite (`db/edms.db`) và bộ nhớ lưu trữ mã hóa (`storage/encrypted`). Mã hóa/giải mã file được thực hiện bởi `server/crypto.py` trước khi lưu/đọc file.
 
